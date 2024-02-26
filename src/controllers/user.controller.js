@@ -1,8 +1,11 @@
 import jwt from 'jsonwebtoken';
+
+import { ApiResponse } from '../helpers/responsHandler.js';
 import { asyncHandler } from '../helpers/asyncHandler.js';
 import { comparePassword, hashPassword } from '../helpers/authHelper.js';
-import { ApiResponse } from '../helpers/responsHandler.js';
 import { User } from '../models/user.model.js';
+import mongoose from 'mongoose';
+import { ApiError } from '../helpers/ApiError.js';
 
 
 export const register = async (req, res) => {
@@ -114,4 +117,79 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
                 cart: req.user.cart
             },
         })
+})
+export const updateCart = asyncHandler(async (req, res) => {
+    const { id, quantity } = req.body;
+    const user = req.user
+
+    if (!(id || quantity)) {
+        throw new ApiError(404, " need both id and quantity")
+    }
+
+    
+    const existingProductIndex = user.cart.findIndex(item => item.productId.toString() === id);
+    
+    if (existingProductIndex !== -1) {
+        // If the product already exists
+        user.cart[existingProductIndex].productQuantity = quantity;
+    } else {
+        // If the product doesn't exist
+        user.cart.push({ productId: id, productQuantity: quantity });
+    }
+
+    try {
+        //* Save the updated user document
+        await user.save({validateBeforeSave: false})
+
+    } catch (error) {
+        console.error("Error while saving user cart:", error);
+        throw new ApiError(500, "Internal Server Error");
+    }
+
+    res.status(200).json(new ApiResponse(200, user, "Product added to cart successfully"));
+})
+export const getCart = asyncHandler(async (req, res) => {
+
+    let cart = await User.aggregate([
+
+        { $match: { _id: new mongoose.Types.ObjectId(req.user._id) } },
+        { $unwind: "$cart" },
+        {
+            $lookup: {
+                from: "products",
+                localField: "cart.productId",
+                foreignField: "_id",
+                as: "cart.productDetails"
+            }
+        },
+        {
+            $group: {
+                _id: "$_id",
+                role: { $first: "$role" },
+                name: { $first: "$name" },
+                email: { $first: "$email" },
+                password: { $first: "$password" },
+                address: { $first: "$address" },
+                phoneNumber: { $first: "$phoneNumber" },
+                image: { $first: "$image" },
+                cart: {
+                    $push: {
+                        productId: "$cart.productId",
+                        productQuantity: "$cart.productQuantity",
+                        productDetails: { $arrayElemAt: ["$cart.productDetails", 0] }
+                    }
+                },
+                accessToken: { $first: "$accessToken" },
+                createdAt: { $first: "$createdAt" },
+                updatedAt: { $first: "$updatedAt" }
+            }
+        }
+    ])
+
+
+    res.status(200).json({
+        statusCode: 200,
+        data: cart,
+        message: "cart fetched successfully"
+      });
 })

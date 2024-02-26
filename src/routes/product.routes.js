@@ -7,7 +7,7 @@ router
     .route('/')
     .get()
     .post(addProduct)
-router.route('/:productId').get(getProductById);
+router.route('/getProductById/:productId').get(getProductById);
 router.route('/:productType').get();
 
 export default router
