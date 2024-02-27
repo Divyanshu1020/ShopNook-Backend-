@@ -122,13 +122,17 @@ export const updateCart = asyncHandler(async (req, res) => {
     const { id, quantity } = req.body;
     const user = req.user
 
-    if (!(id || quantity)) {
+    if (!id || !quantity) {
         throw new ApiError(404, " need both id and quantity")
     }
 
-    
-    const existingProductIndex = user.cart.findIndex(item => item.productId.toString() === id);
-    
+    //* Check if productId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, "Invalid Product ID");
+    }
+
+    const existingProductIndex = user.cart.findIndex(item => item.productId && item.productId.equals(id));
+
     if (existingProductIndex !== -1) {
         // If the product already exists
         user.cart[existingProductIndex].productQuantity = quantity;
@@ -139,7 +143,7 @@ export const updateCart = asyncHandler(async (req, res) => {
 
     try {
         //* Save the updated user document
-        await user.save({validateBeforeSave: false})
+        await user.save({ validateBeforeSave: false })
 
     } catch (error) {
         console.error("Error while saving user cart:", error);
@@ -150,46 +154,66 @@ export const updateCart = asyncHandler(async (req, res) => {
 })
 export const getCart = asyncHandler(async (req, res) => {
 
-    let cart = await User.aggregate([
+    try {
+        let cart = await User.aggregate([
 
-        { $match: { _id: new mongoose.Types.ObjectId(req.user._id) } },
-        { $unwind: "$cart" },
-        {
-            $lookup: {
-                from: "products",
-                localField: "cart.productId",
-                foreignField: "_id",
-                as: "cart.productDetails"
+            { $match: { _id: new mongoose.Types.ObjectId(req.user._id) } },
+            { $unwind: "$cart" },
+            {
+                $lookup: {
+                    from: "products",
+                    let: { productId: "$cart.productId" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: { $eq: ["$_id", "$$productId"] }
+                            }
+                        },
+                        {
+                            $project: {
+                                _id: 1,
+                                price: 1,
+                                actualPrice: 1,
+                                description: 1,
+                                thumbnail: 1,
+                                rating: 1
+                            }
+                        }
+                    ],
+                    as: "cart.productDetails"
+                }
+            },
+            {
+                $group: {
+                    _id: "$_id",
+                    role: { $first: "$role" },
+                    name: { $first: "$name" },
+                    email: { $first: "$email" },
+                    password: { $first: "$password" },
+                    address: { $first: "$address" },
+                    phoneNumber: { $first: "$phoneNumber" },
+                    image: { $first: "$image" },
+                    cart: {
+                        $push: {
+                            productId: "$cart.productId",
+                            productQuantity: "$cart.productQuantity",
+                            productDetails: { $arrayElemAt: ["$cart.productDetails", 0] }
+                        }
+                    },
+                    accessToken: { $first: "$accessToken" },
+                    createdAt: { $first: "$createdAt" },
+                    updatedAt: { $first: "$updatedAt" }
+                }
             }
-        },
-        {
-            $group: {
-                _id: "$_id",
-                role: { $first: "$role" },
-                name: { $first: "$name" },
-                email: { $first: "$email" },
-                password: { $first: "$password" },
-                address: { $first: "$address" },
-                phoneNumber: { $first: "$phoneNumber" },
-                image: { $first: "$image" },
-                cart: {
-                    $push: {
-                        productId: "$cart.productId",
-                        productQuantity: "$cart.productQuantity",
-                        productDetails: { $arrayElemAt: ["$cart.productDetails", 0] }
-                    }
-                },
-                accessToken: { $first: "$accessToken" },
-                createdAt: { $first: "$createdAt" },
-                updatedAt: { $first: "$updatedAt" }
-            }
-        }
-    ])
+        ])
 
 
-    res.status(200).json({
-        statusCode: 200,
-        data: cart,
-        message: "cart fetched successfully"
-      });
+        res.status(200).json({
+            statusCode: 200,
+            data: cart,
+            message: "cart fetched successfully"
+        });
+    } catch (error) {
+        throw new ApiError(400, `Error fetching cart: ${error.message}`)
+    }
 })
