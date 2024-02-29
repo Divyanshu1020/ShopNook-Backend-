@@ -1,11 +1,11 @@
 import jwt from 'jsonwebtoken';
 
-import { ApiResponse } from '../helpers/responsHandler.js';
-import { asyncHandler } from '../helpers/asyncHandler.js';
-import { comparePassword, hashPassword } from '../helpers/authHelper.js';
-import { User } from '../models/user.model.js';
 import mongoose from 'mongoose';
 import { ApiError } from '../helpers/ApiError.js';
+import { asyncHandler } from '../helpers/asyncHandler.js';
+import { comparePassword, hashPassword } from '../helpers/authHelper.js';
+import { ApiResponse } from '../helpers/responsHandler.js';
+import { User } from '../models/user.model.js';
 
 
 export const register = async (req, res) => {
@@ -156,63 +156,62 @@ export const getCart = asyncHandler(async (req, res) => {
 
     try {
         let cart = await User.aggregate([
-
-            { $match: { _id: new mongoose.Types.ObjectId(req.user._id) } },
+            {
+                $match: { _id: new mongoose.Types.ObjectId(req.user._id) }
+            },
             { $unwind: "$cart" },
             {
                 $lookup: {
-                    from: "products",
+                    from: "products", // The name of the Product collection
                     let: { productId: "$cart.productId" },
                     pipeline: [
                         {
                             $match: {
-                                $expr: { $eq: ["$_id", "$$productId"] }
-                            }
+                                $expr: {
+                                    $eq: ["$_id", "$$productId"],
+                                },
+                            },
                         },
                         {
                             $project: {
-                                _id: 1,
                                 price: 1,
                                 actualPrice: 1,
                                 description: 1,
                                 thumbnail: 1,
-                                rating: 1
-                            }
-                        }
+                                rating: 1,
+                            },
+                        },
                     ],
-                    as: "cart.productDetails"
-                }
+                    as: "cart.productDetails",
+                },
             },
             {
                 $group: {
                     _id: "$_id",
-                    role: { $first: "$role" },
-                    name: { $first: "$name" },
-                    email: { $first: "$email" },
-                    password: { $first: "$password" },
-                    address: { $first: "$address" },
-                    phoneNumber: { $first: "$phoneNumber" },
-                    image: { $first: "$image" },
                     cart: {
                         $push: {
                             productId: "$cart.productId",
-                            productQuantity: "$cart.productQuantity",
-                            productDetails: { $arrayElemAt: ["$cart.productDetails", 0] }
-                        }
+                            productQuantity:
+                                "$cart.productQuantity",
+                            productDetails: {
+                                $arrayElemAt: [
+                                    "$cart.productDetails",
+                                    0,
+                                ],
+                            },
+                        },
                     },
-                    accessToken: { $first: "$accessToken" },
-                    createdAt: { $first: "$createdAt" },
-                    updatedAt: { $first: "$updatedAt" }
-                }
-            }
+                },
+            },
+            {
+                $project: {
+                    cart: 1
+                },
+            },
         ])
 
+        res.status(200).json(new ApiResponse(200, cart, "cart fetched successfully"));
 
-        res.status(200).json({
-            statusCode: 200,
-            data: cart,
-            message: "cart fetched successfully"
-        });
     } catch (error) {
         throw new ApiError(400, `Error fetching cart: ${error.message}`)
     }
