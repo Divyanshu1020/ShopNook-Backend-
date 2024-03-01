@@ -118,7 +118,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
             },
         })
 })
-export const updateCart = asyncHandler(async (req, res) => {
+export const updateCartItem = asyncHandler(async (req, res) => {
     const { id, quantity } = req.body;
     const user = req.user
 
@@ -150,9 +150,9 @@ export const updateCart = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Internal Server Error");
     }
 
-    res.status(200).json(new ApiResponse(200, user, "Product added to cart successfully"));
+    res.status(200).json(new ApiResponse(200, {}, "Product added to cart successfully"));
 })
-export const getCart = asyncHandler(async (req, res) => {
+export const getCartItems = asyncHandler(async (req, res) => {
 
     try {
         let cart = await User.aggregate([
@@ -215,4 +215,61 @@ export const getCart = asyncHandler(async (req, res) => {
     } catch (error) {
         throw new ApiError(400, `Error fetching cart: ${error.message}`)
     }
+})
+export const deleteCartItem = asyncHandler(async (req, res) => {
+    const { id, } = req.body;
+    const user = req.user
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(404, " Invalid Product ID")
+    }
+    const productIndex = user.cart.findIndex(item => item.productId && item.productId.equals(id));
+    user.cart.splice(productIndex, 1)
+    try {
+        //* Save the updated user document
+        await user.save({ validateBeforeSave: false })
+        res.status(200).json(new ApiResponse(200, {}, "Product deleted from cart successfully"));
+
+    } catch (error) {
+        throw new ApiError(404, `While deleting product this error occurred ${error.message}`)
+    }
+})
+export const getWishlistItems = asyncHandler(async (req, res) => {
+
+
+})
+export const updateWishlistItem = asyncHandler(async (req, res) => {
+
+
+})
+export const addWishlistItem = asyncHandler(async (req, res) => {
+    const { id } = req.body;
+    const user = req.user
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(404, " need both id and quantity")
+    }
+
+
+    const productIndex = user.cart.findIndex(item => item._id.equals(id));
+
+    // if (existingProductIndex !== -1) {
+    //     // If the product already exists
+    //     user.cart[existingProductIndex].productQuantity = quantity;
+    // } else {
+    //     // If the product doesn't exist
+    //     user.cart.push({ productId: id, productQuantity: quantity });
+    // }
+
+    try {
+        //* Save the updated user document
+        await user.save({ validateBeforeSave: false })
+
+    } catch (error) {
+        console.error("Error while saving user cart:", error);
+        throw new ApiError(500, "Internal Server Error");
+    }
+
+    res.status(200).json(new ApiResponse(200, {}, "Product added to cart successfully"));
+
 })
