@@ -1,5 +1,5 @@
 import Express from "express";
-import {  deleteCartItem, getCartItems, getCurrentUser,  getWishlistItems,  login, register, updateCartItem, updateWishlistItem, } from "../controllers/user.controller.js";
+import {  addWishlistItem, deleteCartItem, getCartItems, getCurrentUser,  getWishlistItems,  login, register, removeWishlistItem, updateCartItem } from "../controllers/user.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
 const router = Express.Router()
@@ -17,7 +17,8 @@ router.route("/cart")
 
 router.route("/wishlist")
 .get(verifyJWT, getWishlistItems)
-.post(verifyJWT, updateWishlistItem)
+.post(verifyJWT, addWishlistItem)
+.delete(verifyJWT, removeWishlistItem)
 
 
 export default router

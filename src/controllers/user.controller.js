@@ -238,38 +238,61 @@ export const getWishlistItems = asyncHandler(async (req, res) => {
 
 
 })
-export const updateWishlistItem = asyncHandler(async (req, res) => {
+export const removeWishlistItem = asyncHandler(async (req, res) => {
 
-
-})
-export const addWishlistItem = asyncHandler(async (req, res) => {
-    const { id } = req.body;
+    const { productId } = req.body;
     const user = req.user
 
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-        throw new ApiError(404, " need both id and quantity")
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+        throw new ApiError(404, " Invalid product Id ")
     }
 
+    const existingProductIndex = user.wishlist.findIndex(item => item.equals(productId));
 
-    const productIndex = user.cart.findIndex(item => item._id.equals(id));
+    if (existingProductIndex !== -1) {
+        
+        user.wishlist.splice(existingProductIndex,1);
+        try {
+            //* Save the updated user document
+            await user.save({ validateBeforeSave: false });
 
-    // if (existingProductIndex !== -1) {
-    //     // If the product already exists
-    //     user.cart[existingProductIndex].productQuantity = quantity;
-    // } else {
-    //     // If the product doesn't exist
-    //     user.cart.push({ productId: id, productQuantity: quantity });
-    // }
+            res.status(200).json(new ApiResponse(200, {}, "Product removed from wishlist successfully"));
+    
+        } catch (error) {
+            console.error("Error while removing product from wishlist:", error);
+            throw new ApiError(500, "Internal Server Error");
+        }
+        
+    } else {
+        throw new ApiError(404, "product not exists")
+    }
+})
+export const addWishlistItem = asyncHandler(async (req, res) => {
+    const { productId } = req.body;
+    const user = req.user
 
-    try {
-        //* Save the updated user document
-        await user.save({ validateBeforeSave: false })
-
-    } catch (error) {
-        console.error("Error while saving user cart:", error);
-        throw new ApiError(500, "Internal Server Error");
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+        throw new ApiError(404, " Invalid product Id ")
     }
 
-    res.status(200).json(new ApiResponse(200, {}, "Product added to cart successfully"));
+    const existingProductIndex = user.wishlist.includes(productId)
+
+    if (!existingProductIndex) {
+        
+        user.wishlist.push(productId);
+        try {
+            //* Save the updated user document
+            await user.save({ validateBeforeSave: false });
+
+            res.status(200).json(new ApiResponse(200, {}, "Product added to wishlist successfully"));
+    
+        } catch (error) {
+            console.error("Error while saving product in wishlist:", error);
+            throw new ApiError(500, "Internal Server Error");
+        }
+        
+    } else {
+        throw new ApiError(201, "product already exists")
+    }
 
 })
