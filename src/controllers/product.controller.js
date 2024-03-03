@@ -44,8 +44,6 @@ export const getProductById = asyncHandler(async (req, res) => {
         pipeline.push(
             {
                 $addFields: { userId: new mongoose.Types.ObjectId(userId) },
-                // @ts-ignore
-                $match: undefined
             },
             {
                 $lookup: {
