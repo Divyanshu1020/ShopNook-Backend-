@@ -88,6 +88,7 @@ export const login = async (req, res) => {
                 success: true,
                 message: `login successful`,
                 user: {
+                    Id: user._id,
                     name: user.name,
                     email: user.email,
                     cart: user.cart
@@ -112,6 +113,7 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
             success: true,
             message: `login successful`,
             user: {
+                userId : req.user._id,
                 name: req.user.name,
                 email: req.user.email,
                 cart: req.user.cart
@@ -236,7 +238,45 @@ export const deleteCartItem = asyncHandler(async (req, res) => {
 })
 export const getWishlistItems = asyncHandler(async (req, res) => {
 
+    const userId = req.user
+    console.log(userId)
 
+    const wishlistItems = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(userId),
+            }
+        },
+        {
+            $project: {
+                wishlistItems: "$wishlist",
+            },
+        },
+        {
+            $lookup: {
+                from: "products",
+                localField: "wishlistItems",
+                foreignField: "_id",
+                as: "wishlistItems",
+                pipeline: [
+                    {
+                        $project: {
+                            description: 1,
+                            price: 1,
+                            thumbnail: 1,
+                            actualPrice: 1,
+                        },
+                    },
+                ],
+            },
+        },
+    ])
+
+    if (wishlistItems.length > 0) {
+        res.json(wishlistItems[0].wishlistItems);
+    } else {
+        res.status(404).json({ message: "Wishlist not found" });
+    }
 })
 export const removeWishlistItem = asyncHandler(async (req, res) => {
 
@@ -250,19 +290,19 @@ export const removeWishlistItem = asyncHandler(async (req, res) => {
     const existingProductIndex = user.wishlist.findIndex(item => item.equals(productId));
 
     if (existingProductIndex !== -1) {
-        
-        user.wishlist.splice(existingProductIndex,1);
+
+        user.wishlist.splice(existingProductIndex, 1);
         try {
             //* Save the updated user document
             await user.save({ validateBeforeSave: false });
 
             res.status(200).json(new ApiResponse(200, {}, "Product removed from wishlist successfully"));
-    
+
         } catch (error) {
             console.error("Error while removing product from wishlist:", error);
             throw new ApiError(500, "Internal Server Error");
         }
-        
+
     } else {
         throw new ApiError(404, "product not exists")
     }
@@ -278,19 +318,19 @@ export const addWishlistItem = asyncHandler(async (req, res) => {
     const existingProductIndex = user.wishlist.includes(productId)
 
     if (!existingProductIndex) {
-        
+
         user.wishlist.push(productId);
         try {
             //* Save the updated user document
             await user.save({ validateBeforeSave: false });
 
             res.status(200).json(new ApiResponse(200, {}, "Product added to wishlist successfully"));
-    
+
         } catch (error) {
             console.error("Error while saving product in wishlist:", error);
             throw new ApiError(500, "Internal Server Error");
         }
-        
+
     } else {
         throw new ApiError(201, "product already exists")
     }
